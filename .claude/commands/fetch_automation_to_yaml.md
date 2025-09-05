@@ -1,0 +1,2 @@
+# Fetch HA stuff from code
+fetch all new entities, helpers, devices, automations, and blueprints from all .yaml file in the project, and put them in devices.md, automations_blueprint.md, helpers.md, and entities.md. check what is already in the .md files and what is not, and then add the missing ones. keep it imformative

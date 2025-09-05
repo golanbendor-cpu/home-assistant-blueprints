@@ -7,8 +7,12 @@
 ### Button/Switch Devices
 - **`9c061be1eb7a3ec725a43e090d619e01`** - Bedroom Button (Sleep/Sonos control)
 - **`2c7ae4a720068cfa4cdf96f6a26f418c`** - Kitchen Partner Day Button
-- **`64785745f5c2df63e5bc26152bdf6903`** - Device ID (identify location)
-- **`73d53367f0a31f66f52d4a5f26194da0`** - Device ID (identify location)
+- **`64785745f5c2df63e5bc26152bdf6903`** - Bedroom Device (used in extra_off_targets)
+- **`73d53367f0a31f66f52d4a5f26194da0`** - Office Device (used in extra_off_targets)
+
+### Network/Media Devices
+- **`44:CB:8B:D1:D1:B0`** - Bedroom PC/TV MAC address (Wake-on-LAN)
+- **`192.168.68.255:9`** - Network broadcast settings for WOL
 
 ## Room Sensors & Zones
 

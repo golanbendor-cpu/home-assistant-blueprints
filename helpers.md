@@ -9,13 +9,28 @@
 ---
 
 ## Bedroom Helpers
+### Bedroom Bed Led Brightness
+- **Entity ID:** `input_number.bedroom_bed_led_brightness`
+- **Type:** Input number
+- **Purpose:** Controls bedroom bed LED brightness
+
 ### Bedroom Bed Led Color Temp  
 - **Entity ID:** `input_number.bedroom_bed_led_color_temp`  
 - **Type:** Input number  
 
+### Bedroom Bed Led Color Mode
+- **Entity ID:** `input_select.bedroom_bed_led_color_mode`
+- **Type:** Input select
+- **Options:** Color Temp, Amber, Warm White, Red, Blue, Green, Purple, Rainbow
+
 ### Bedroom Bed Led Sensors Enable  
 - **Entity ID:** `input_boolean.bedroom_bed_led_sensors_enable`  
 - **Type:** Input boolean  
+
+### Bedroom Allow Light With TV
+- **Entity ID:** `input_boolean.bedroom_allow_light_with_tv`
+- **Type:** Input boolean
+- **Purpose:** Allow bedroom lights when TV is on
 
 ### Bedroom Block Bed Leds  
 - **Entity ID:** `binary_sensor.bedroom_block_bed_leds`  
@@ -101,7 +116,12 @@
 
 ### Laundry Sensors Enable  
 - **Entity ID:** `input_boolean.laundry_sensors_enable`  
-- **Type:** Input boolean  
+- **Type:** Input boolean
+
+### Laundry Room Sensors Enable (Alternative naming)
+- **Entity ID:** `input_boolean.laundry_room_sensors_enable`
+- **Type:** Input boolean
+- **Note:** Used in some automation configs  
 
 ### Living Room Mode  
 - **Entity ID:** `input_select.living_room_mode`  
@@ -110,7 +130,12 @@
 
 ### Living Room Previous Mode  
 - **Entity ID:** `input_select.living_room_previous_mode`  
-- **Type:** Input select  
+- **Type:** Input select
+
+### Living Room Prev Mode (Alternate)
+- **Entity ID:** `input_select.living_room_prev_mode`
+- **Type:** Input select
+- **Purpose:** Previous mode storage for living room table contact automation
 
 ### Living Room Sensors Enable  
 - **Entity ID:** `input_boolean.living_room_sensors_enable`  
@@ -141,7 +166,12 @@
 
 ### Storage Room Sensors Enable  
 - **Entity ID:** `input_boolean.storage_room_sensors_enable`  
-- **Type:** Input boolean  
+- **Type:** Input boolean
+
+### Storage Sensors Enable (Alternative naming)
+- **Entity ID:** `input_boolean.storage_sensors_enable`
+- **Type:** Input boolean
+- **Note:** Used in some automation configs  
 
 ---
 

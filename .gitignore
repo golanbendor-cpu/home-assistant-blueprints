@@ -160,6 +160,14 @@ github_credentials.md
 gist_backup/
 gist_backuo/
 
+# === EXCLUDE DEVICE TRACKING ===
+# Device and entity tracking files (contain device IDs)
+devices.md
+automations_blueprint.md
+entities.md
+entities_summary.md
+entity_results.txt
+
 # === INCLUDE SAFE FILES ===
 !scripts/**/*.yaml
 !helpers.md
