@@ -18,6 +18,14 @@ This is a comprehensive Home Assistant configuration for a real house automation
 - **Automatic updates** to bugs.md and CLAUDE.md when bugs are fixed or features are implemented
 - **Blueprint testing** should be done via Home Assistant configuration validation commands before deployment
 
+## Documentation Usage for Claude
+When helping with Home Assistant tasks, **always reference these comprehensive documentation files**:
+- **`entities.md`** - When working with any entities, sensors, lights, or helpers
+- **`devices.md`** - When dealing with device IDs, MAC addresses, or hardware references
+- **`automations_blueprint.md`** - When creating, modifying, or troubleshooting automations
+- **`helpers.md`** - When configuring input helpers or understanding room patterns
+- These files contain **complete, up-to-date information** extracted from all YAML files
+
 ## Architecture & Structure
 
 ### Core Components
@@ -34,7 +42,11 @@ This is a comprehensive Home Assistant configuration for a real house automation
   - `living_room/`: Table contact automation
   - `partner_day/`: Daily reset automation
 - **Scripts** (`scripts/scripts.yaml`): Utility scripts for device control (e.g., bedroom TV CEC/WOL)
-- **Helpers** (`helpers.md`): Input booleans, selects, numbers, and timers that control automation behavior
+- **Documentation Files** (comprehensive references for Claude):
+  - `helpers.md`: Input booleans, selects, numbers, and timers that control automation behavior
+  - `entities.md`: Complete entity reference across all domains (100+ entities)
+  - `devices.md`: Device IDs, MAC addresses, and hardware inventory
+  - `automations_blueprint.md`: Detailed automation and blueprint documentation
 
 ### Room-Based Architecture
 Each room follows a standardized pattern with these helpers:

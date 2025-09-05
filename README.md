@@ -9,6 +9,9 @@
 | 🔧 **Need to implement a new feature?** | `future_features.md` |
 | 🐛 **Found a bug or issue?** | `bugs.md` |
 | 🎛️ **Looking for helper entities?** | `helpers.md` |
+| 🔗 **Need entity references (sensors, lights, etc)?** | `entities.md` |
+| 📱 **Looking for device IDs or hardware info?** | `devices.md` |
+| 🤖 **Understanding automations & blueprints?** | `automations_blueprint.md` |
 | ✅ **Want to see what's already built?** | `added_features.md` |
 | 🚀 **Need to commit changes to Git?** | `GIT_WORKFLOW.md` |
 | 🏗️ **Working on automations/blueprints?** | `CLAUDE.md` |

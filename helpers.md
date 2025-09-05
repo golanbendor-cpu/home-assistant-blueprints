@@ -117,11 +117,7 @@
 ### Laundry Sensors Enable  
 - **Entity ID:** `input_boolean.laundry_sensors_enable`  
 - **Type:** Input boolean
-
-### Laundry Room Sensors Enable (Alternative naming)
-- **Entity ID:** `input_boolean.laundry_room_sensors_enable`
-- **Type:** Input boolean
-- **Note:** Used in some automation configs  
+- **Note:** Used with laundry_room_mode for laundry room sensor control  
 
 ### Living Room Mode  
 - **Entity ID:** `input_select.living_room_mode`  
@@ -129,11 +125,7 @@
 - **Options:** Auto, Day, Night, Off  
 
 ### Living Room Previous Mode  
-- **Entity ID:** `input_select.living_room_previous_mode`  
-- **Type:** Input select
-
-### Living Room Prev Mode (Alternate)
-- **Entity ID:** `input_select.living_room_prev_mode`
+- **Entity ID:** `input_select.living_room_previous_mode`
 - **Type:** Input select
 - **Purpose:** Previous mode storage for living room table contact automation
 
@@ -167,11 +159,7 @@
 ### Storage Room Sensors Enable  
 - **Entity ID:** `input_boolean.storage_room_sensors_enable`  
 - **Type:** Input boolean
-
-### Storage Sensors Enable (Alternative naming)
-- **Entity ID:** `input_boolean.storage_sensors_enable`
-- **Type:** Input boolean
-- **Note:** Used in some automation configs  
+- **Note:** Used with storage_room_mode for storage room sensor control  
 
 ---
 
