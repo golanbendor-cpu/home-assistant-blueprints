@@ -1,0 +1,197 @@
+# ===== HOME ASSISTANT SECURITY SETTINGS =====
+
+# === SENSITIVE CONFIGURATION FILES ===
+# Never commit files with passwords, tokens, or API keys
+secrets.yaml
+secrets.yml
+known_devices.yaml
+ip_bans.yaml
+core.config_entries
+core.device_registry
+core.entity_registry
+core.restore_state
+*.pid
+*.conf
+
+# === DATABASE AND LOGS ===
+# Home Assistant database and log files
+home-assistant_v2.db*
+home-assistant.log*
+*.log
+OZW_Log.txt
+
+# === DEVICE SPECIFIC FILES ===
+# Files containing device IDs, MAC addresses, or network info
+# (These may contain sensitive hardware identifiers)
+*.db-shm
+*.db-wal
+*.uuid
+
+# === BACKUP AND TEMPORARY FILES ===
+# Backup files and temporary data
+.backup/
+backups/
+*.backup
+*.bak
+*~
+*.tmp
+.HA_VERSION
+
+# === DEVELOPMENT AND IDE FILES ===
+# Development environment files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === NODE MODULES AND DEPENDENCIES ===
+# If using any Node.js tools
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# === PYTHON CACHE ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env
+.venv
+
+# === CUSTOM COMPONENT CACHES ===
+# Custom component download caches
+custom_components/**/.translations/
+custom_components/**/translations/
+
+# === LOVELACE AND UI ===
+# UI configuration backups
+.storage/lovelace*
+.storage/auth*
+.storage/onboarding
+.storage/hassio
+.storage/cloud*
+
+# === NETWORK DISCOVERY ===
+# Network device discovery cache
+.storage/zeroconf
+
+# === TEMPLATE FILES (KEEP PRIVATE) ===
+# These are sanitized versions for public sharing
+public_gist_templates/
+!public_gist_templates/*.yaml
+
+# === INTEGRATION SPECIFIC ===
+# Various integration files that may contain sensitive data
+.storage/
+!.storage/README.md
+plex.conf
+alexa_media*.pickle
+*.pem
+*.key
+*.crt
+*.p12
+
+# === ADDON SPECIFIC ===
+# Addon configuration files
+add-on-*/*.yaml
+addons/
+
+# === ZWAVEJS ===
+# Z-Wave JS logs and cache
+zwave_js/
+zwavejs2mqtt/
+
+# === ZIGBEE ===
+# Zigbee coordinator database
+zigbee.db*
+
+# === ESPHOME ===
+# ESPHome build files
+esphome/
+*.bin
+
+# === CAMERA AND MEDIA ===
+# Camera snapshots and media files
+www/snapshots/
+www/tmp/
+camera/
+media/
+
+# === EXCEPTIONS - FILES TO INCLUDE ===
+# Include important documentation and template files
+!README.md
+!*.md
+!CLAUDE.md
+!automations/README.md
+!blueprints/README.md
+
+# === EXCLUDE SENSITIVE AUTOMATION FILES ===
+# Automations contain device IDs and network info - keep private
+automations/
+
+# === EXCLUDE SENSITIVE TRACES ===
+# Traces may contain sensitive debug information
+traces/
+
+# === BLUEPRINT SECURITY ===
+# Exclude Gist folders (they have device IDs) but include main blueprints
+blueprints/*_gist/
+# Main blueprint files are OK if sanitized
+!blueprints/*.yaml
+
+# === EXCLUDE SENSITIVE MD FILES ===
+# MD files with device IDs, Gist links, or sensitive info
+gist_readme_updated.md
+added_features.md
+
+# === EXCLUDE GITHUB CREDENTIALS ===
+# GitHub tokens and credentials - keep private
+github_credentials.md
+
+# === EXCLUDE BACKUP FOLDERS ===
+# Backup and temporary folders
+gist_backup/
+gist_backuo/
+
+# === INCLUDE SAFE FILES ===
+!scripts/**/*.yaml
+!helpers.md
+!bugs.md
+!general.md
+!new_features.md
+!future_features.md
+
+# Include configuration templates
+!configuration.yaml
+!automations.yaml
+!scripts.yaml
+!scenes.yaml
+!groups.yaml
+!customize.yaml
+
+# === SPECIFIC SENSITIVE PATTERNS ===
+# Regex patterns for sensitive data (git won't use regex in .gitignore but good for documentation)
+# Device IDs: [0-9a-f]{32}
+# MAC Addresses: [0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}
+# IP Addresses: 192.168.x.x, 10.0.x.x, 172.16.x.x
+
+# === WARNING COMMENT ===
+# 
+# IMPORTANT: Before committing, always verify that automation files
+# don't contain sensitive device IDs or network information.
+# 
+# If you need to share automation files publicly:
+# 1. Use the sanitized templates in public_gist_templates/
+# 2. Replace device IDs with "YOUR_DEVICE_ID_HERE"  
+# 3. Replace MAC addresses with "00:11:22:33:44:55"
+# 4. Replace IP addresses with "192.168.1.100"
+#
+# Your actual automation files should remain in this private repo.
+#token

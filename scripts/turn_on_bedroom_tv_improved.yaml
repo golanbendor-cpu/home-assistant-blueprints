@@ -1,0 +1,40 @@
+alias: turn_on_bedroom_tv_cec_wol
+mode: single
+sequence:
+# Step 1: Set Sonos to TV mode first
+- target:
+    entity_id: media_player.bedroom_sonos_beam
+  data:
+    source: TV
+  action: media_player.select_source
+# Step 2: Send WOL packet (may need multiple attempts)
+- repeat:
+    count: 3
+    sequence:
+    - data:
+        mac: 44:CB:8B:D1:D1:B0
+        broadcast_address: 192.168.68.255
+        broadcast_port: 9
+      action: wake_on_lan.send_magic_packet
+    - delay: 00:00:02
+# Step 3: Wait longer for network wake up  
+- delay: 00:00:08
+# Step 4: Try to turn on TV via Home Assistant
+- target:
+    entity_id: media_player.lg_tv_oled55b9pva
+  action: media_player.turn_on
+# Step 5: Wait for TV to respond with longer timeout
+- wait_template: '{{ states(''media_player.lg_tv_oled55b9pva'') not in [''off'',''unknown'',''unavailable''] }}'
+  timeout: 00:00:30
+  continue_on_timeout: true
+# Step 6: If still not on, try one more direct turn_on
+- choose:
+  - conditions:
+    - condition: state
+      entity_id: media_player.lg_tv_oled55b9pva
+      state: 'off'
+    sequence:
+    - delay: 00:00:03
+    - target:
+        entity_id: media_player.lg_tv_oled55b9pva
+      action: media_player.turn_on
