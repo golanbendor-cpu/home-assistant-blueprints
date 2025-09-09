@@ -1,0 +1,944 @@
+blueprint:
+  name: Room Presence/Motion Plus (Auto Night Safe + Adopt External ON)
+  description: >
+    Unified presence/motion lighting with per-room enable and mode (Auto / Day / Night / Off).
+    Works with presence and/or motion. Features: Yeelight normal/moonlight, fixed Day colors (4000K),
+    Auto Night dimming (brightness only), Partner Day override, Ambilight OFF on activity, extras ON/OFF,
+    Sleep -> Night override, daily Partner Day reset (optional), adopt external manual ON, tick-interval gate,
+    apply-only-when-on, and bedroom-safe options to block turn-on at night and/or during Sleep.
+  domain: automation
+
+  input:
+    master_enable:
+      name: Master enable (global kill switch)
+      selector: { entity: { domain: input_boolean } }
+
+    room_enable:
+      name: Room sensors enable
+      selector: { entity: { domain: input_boolean } }
+
+    room_mode:
+      name: Room mode selector (Auto / Day / Night / Off)
+      selector: { entity: { domain: input_select } }
+
+    presence_zones:
+      name: Presence zones (occupancy)
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+              device_class: occupancy
+
+    motion_sensors:
+      name: Motion sensors (optional)
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+              device_class: motion
+
+    keep_on_zones:
+      name: Keep-ON zones (optional)
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+
+    main_light:
+      name: Main light
+      selector: { entity: { domain: light } }
+
+    night_light:
+      name: Night light (optional)
+      default: null
+      selector: { entity: { domain: light } }
+
+    coalesce_window:
+      name: Motion coalesce window
+      description: Delay applied only for motion-on events to debounce bursts.
+      default: "00:00:00"
+      selector: { duration: {} }
+
+    off_delay:
+      name: Off delay
+      description: Wait after last activity before turning off.
+      default: "00:01:00"
+      selector: { duration: {} }
+
+    use_yeelight_modes:
+      name: Use Yeelight modes
+      default: true
+      selector: { boolean: {} }
+
+    brightness_day_pct:
+      name: Day brightness %
+      default: 100
+      selector: { number: { min: 1, max: 100, unit_of_measurement: "%" } }
+
+    day_color_mireds:
+      name: Day color temperature (mireds)
+      description: 250 mireds ≈ 4000K. Used for Day / Auto Day / Partner Day override.
+      default: 250
+      selector: { number: { min: 153, max: 370 } }
+
+    brightness_night_pct:
+      name: Night brightness % (manual Night)
+      default: 1
+      selector: { number: { min: 1, max: 100, unit_of_measurement: "%" } }
+
+    auto_day_start:
+      name: Auto Day start
+      default: "11:00:00"
+      selector: { time: {} }
+
+    auto_day_end:
+      name: Auto Day end
+      default: "21:00:00"
+      selector: { time: {} }
+
+    lux_sensor:
+      name: Lux sensor (optional)
+      default: null
+      selector: { entity: { domain: sensor } }
+
+    lux_threshold:
+      name: Lux threshold
+      default: 50
+      selector: { number: { min: 0, max: 1000 } }
+
+    use_lux_for_day_only:
+      name: Apply lux gate only for Day and Auto Day
+      default: true
+      selector: { boolean: {} }
+
+    global_night_mode:
+      name: Global Sleep Mode (button)
+      selector: { entity: { domain: input_boolean } }
+
+    global_day_override:
+      name: Partner Day override (button)
+      selector: { entity: { domain: input_boolean } }
+
+    honor_day_override:
+      name: Honor Partner Day in this room
+      description: Set false in rooms that must ignore Partner Day.
+      default: true
+      selector: { boolean: {} }
+
+    partner_day_auto_reset_here:
+      name: Reset Partner Day FROM THIS automation
+      default: false
+      selector: { boolean: {} }
+
+    partner_day_reset_time:
+      name: Partner Day reset time
+      default: "11:00:00"
+      selector: { time: {} }
+
+    sleep_forces_night_here:
+      name: Sleep Mode forces Night in this room
+      default: false
+      selector: { boolean: {} }
+
+    sleep_overrides_off_here:
+      name: Sleep Mode can override Off
+      default: false
+      selector: { boolean: {} }
+
+    sleep_return_to_auto_on_wake:
+      name: Return mode to Auto when Sleep turns OFF
+      default: true
+      selector: { boolean: {} }
+
+    auto_night_block_turn_on:
+      name: Block turn-ON in Auto Night
+      default: false
+      selector: { boolean: {} }
+
+    sleep_block_turn_on:
+      name: Block turn-ON during Sleep
+      default: false
+      selector: { boolean: {} }
+
+    extra_on_targets:
+      name: Extra targets ON (optional)
+      default: {}
+      selector: { target: {} }
+
+    extra_off_targets:
+      name: Extra targets OFF (optional)
+      default: {}
+      selector: { target: {} }
+
+    ambilight_entity:
+      name: Ambilight (optional)
+      default: null
+      selector: { entity: { domain: light } }
+
+    night_dim_enable:
+      name: Enable Auto Night dimming (Auto only)
+      default: true
+      selector: { boolean: {} }
+
+    night_start_time:
+      name: Auto Night dim start time
+      default: "21:00:00"
+      selector: { time: {} }
+
+    night_target_time:
+      name: Auto Night target time
+      default: "23:00:00"
+      selector: { time: {} }
+
+    night_start_brightness_pct:
+      name: Start brightness % at Auto Night
+      default: 70
+      selector: { number: { min: 1, max: 100, unit_of_measurement: "%" } }
+
+    night_target_brightness_pct:
+      name: Target brightness % by target time
+      default: 3
+      selector: { number: { min: 1, max: 100, unit_of_measurement: "%" } }
+
+    enforce_effect_stop:
+      name: Send effect Stop on Auto Night
+      default: true
+      selector: { boolean: {} }
+
+    apply_only_when_on:
+      name: Apply dim only when light is already ON
+      default: true
+      selector: { boolean: {} }
+
+    transition_immediate_sec:
+      name: Transition seconds (immediate apply)
+      default: 1
+      selector: { number: { min: 0, max: 60, unit_of_measurement: "s" } }
+
+    transition_gradual_sec:
+      name: Transition seconds (ticks)
+      default: 30
+      selector: { number: { min: 0, max: 300, unit_of_measurement: "s" } }
+
+    refresh_minutes:
+      name: Dim tick interval (minutes)
+      default: 5
+      selector: { number: { min: 1, max: 30, unit_of_measurement: "min" } }
+
+    adopt_external_on:
+      name: Adopt external ON (Alexa/app)
+      default: true
+      selector: { boolean: {} }
+
+    adopt_grace:
+      name: External ON grace (seconds)
+      default: 90
+      selector: { number: { min: 0, max: 600, unit_of_measurement: "s" } }
+
+    adopt_only_in_auto:
+      name: Adopt only when room is Auto
+      default: true
+      selector: { boolean: {} }
+
+    global_manual_override_timer:
+      name: Global manual override timer (optional)
+      description: Global timer shared across all rooms (1.5 minutes recommended)
+      default: null
+      selector: { entity: { domain: timer } }
+
+    set_auto_on_manual_on:
+      name: Set room to Auto when manually turned on
+      default: true
+      selector: { boolean: {} }
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  master_enable_entity: !input master_enable
+  room_enable_entity: !input room_enable
+  room_mode_entity: !input room_mode
+
+  presence_list: !input presence_zones
+  motion_list: !input motion_sensors
+  keep_on_list: !input keep_on_zones
+
+  main_light_entity: !input main_light
+  night_light_entity: !input night_light
+  target_night_light: "{{ night_light_entity if night_light_entity else main_light_entity }}"
+
+  coalesce_window: !input coalesce_window
+  off_delay: !input off_delay
+  use_yeelight_modes: !input use_yeelight_modes
+
+  brightness_day_pct: !input brightness_day_pct
+  day_mireds: !input day_color_mireds
+  brightness_night_pct: !input brightness_night_pct
+
+  auto_day_start: !input auto_day_start
+  auto_day_end: !input auto_day_end
+
+  # Day window in minutes (wrap safe)
+  auto_day_start_min: "{{ strptime(auto_day_start, '%H:%M:%S').hour*60 + strptime(auto_day_start, '%H:%M:%S').minute }}"
+  auto_day_end_min: "{{ strptime(auto_day_end, '%H:%M:%S').hour*60 + strptime(auto_day_end, '%H:%M:%S').minute }}"
+
+  lux_entity: !input lux_sensor
+  lux_threshold: !input lux_threshold
+  lux_day_only: !input use_lux_for_day_only
+
+  global_night_entity: !input global_night_mode
+  global_day_entity: !input global_day_override
+  honor_day: !input honor_day_override
+  reset_pd_here: !input partner_day_auto_reset_here
+  reset_pd_time: !input partner_day_reset_time
+
+  sleep_forces_night: !input sleep_forces_night_here
+  sleep_overrides_off: !input sleep_overrides_off_here
+  sleep_return_to_auto: !input sleep_return_to_auto_on_wake
+
+  auto_night_block_turn_on: !input auto_night_block_turn_on
+  sleep_block_turn_on: !input sleep_block_turn_on
+
+  extra_on: !input extra_on_targets
+  extra_off: !input extra_off_targets
+  ambilight: !input ambilight_entity
+
+  night_dim_enable: !input night_dim_enable
+  night_start_time: !input night_start_time
+  night_target_time: !input night_target_time
+  night_start_pct: !input night_start_brightness_pct
+  night_target_pct: !input night_target_brightness_pct
+  stop_effect: !input enforce_effect_stop
+  only_when_on: !input apply_only_when_on
+  t_immediate: !input transition_immediate_sec
+  t_gradual: !input transition_gradual_sec
+  refresh_mins: !input refresh_minutes
+
+  adopt_on: !input adopt_external_on
+  adopt_grace: !input adopt_grace
+  adopt_only_in_auto: !input adopt_only_in_auto
+  override_timer: !input global_manual_override_timer
+  set_auto_on_manual: !input set_auto_on_manual_on
+
+  current_mode: "{{ states(room_mode_entity) }}"
+  manual_override_active: "{{ override_timer and is_state(override_timer, 'active') }}"
+
+  any_presence_on: "{{ expand(presence_list) | selectattr('state','eq','on') | list | length > 0 }}"
+  all_presence_off: "{{ expand(presence_list) | selectattr('state','eq','on') | list | length == 0 }}"
+  any_motion_on: "{{ expand(motion_list) | selectattr('state','eq','on') | list | length > 0 }}"
+  all_motion_off: "{{ expand(motion_list) | selectattr('state','eq','on') | list | length == 0 }}"
+  keep_on_active: "{{ expand(keep_on_list) | selectattr('state','eq','on') | list | length > 0 }}"
+
+  any_active: "{{ any_presence_on or any_motion_on }}"
+  all_clear: "{{ (not any_presence_on) and (not any_motion_on) }}"
+
+  # Auto Day window (wrap safe)
+  now_min: "{{ now().hour*60 + now().minute }}"
+  in_auto_day_window: >
+    {% set s = auto_day_start_min | int %}
+    {% set e = auto_day_end_min | int %}
+    {% set t = now_min | int %}
+    {% set wraps = e < s %}
+    {{ (not wraps and s <= t <= e) or (wraps and (t >= s or t <= e)) }}
+
+  global_night_on: "{{ is_state(global_night_entity, 'on') }}"
+  global_day_on: "{{ is_state(global_day_entity, 'on') }}"
+
+  effective_mode: >
+    {% if current_mode == 'Auto' %}
+      {% if global_day_on and honor_day %}Day
+      {% elif global_night_on %}Night
+      {% elif in_auto_day_window %}Day
+      {% else %}Night
+      {% endif %}
+    {% else %}
+      {{ current_mode }}
+    {% endif %}
+
+  lux_value: >
+    {% if lux_entity %}{{ states(lux_entity) | float(99999) }}{% else %}0{% endif %}
+  lux_ok_day: "{{ not lux_entity or lux_value < lux_threshold }}"
+  lux_ok_night: "{{ not lux_entity or (not lux_day_only and lux_value < lux_threshold) or lux_day_only }}"
+
+  # Auto Night window and ramp (wrap safe + zero-span safe)
+  night_start_min: "{{ strptime(night_start_time, '%H:%M:%S').hour*60 + strptime(night_start_time, '%H:%M:%S').minute }}"
+  night_target_min: "{{ strptime(night_target_time, '%H:%M:%S').hour*60 + strptime(night_target_time, '%H:%M:%S').minute }}"
+  in_auto_night_window: >
+    {% set s = night_start_min %}
+    {% set e = night_target_min %}
+    {% set t = now_min %}
+    {% set wraps = e < s %}
+    {{ (not wraps and s <= t < e) or (wraps and (t >= s or t < e)) }}
+  auto_night_pct: >-
+    {% set s = night_start_min %}
+    {% set e = night_target_min %}
+    {% set t = now_min %}
+    {% set wraps = e < s %}
+    {% set span = (e + (1440 if wraps else 0)) - s %}
+    {% if span <= 0 %}
+      {{ night_target_pct }}
+    {% else %}
+      {% set pos = ((t + (1440 if wraps and t < s else 0)) - s) %}
+      {% if t < s and not wraps %}
+        {{ night_target_pct }}
+      {% elif pos >= span %}
+        {{ night_target_pct }}
+      {% else %}
+        {{ (night_start_pct - ((night_start_pct - night_target_pct) * pos / span)) | round(0) }}
+      {% endif %}
+    {% endif %}
+
+  tick_ok: "{{ (now().minute | int) % (refresh_mins | int) == 0 }}"
+
+trigger:
+  # presence
+  - id: presence_on
+    platform: state
+    entity_id: !input presence_zones
+    to: "on"
+
+  - id: presence_clear
+    platform: state
+    entity_id: !input presence_zones
+    to: "off"
+    for: !input off_delay
+
+  # motion
+  - id: motion_on
+    platform: state
+    entity_id: !input motion_sensors
+    to: "on"
+
+  - id: motion_clear
+    platform: state
+    entity_id: !input motion_sensors
+    to: "off"
+    for: !input off_delay
+
+  # helpers
+  - id: mode_changed
+    platform: state
+    entity_id: !input room_mode
+
+  - id: enable_changed
+    platform: state
+    entity_id: !input room_enable
+
+  - id: global_night_changed
+    platform: state
+    entity_id: !input global_night_mode
+
+  - id: global_day_changed
+    platform: state
+    entity_id: !input global_day_override
+
+  - id: partner_day_reset
+    platform: time
+    at: "{{ reset_pd_time }}"
+
+  # Adopt external ON (manual/Alexa/app)
+  - id: external_main_on
+    platform: state
+    entity_id: !input main_light
+    to: "on"
+
+  # Detect external OFF (manual/Alexa/app)
+  - id: external_main_off
+    platform: state
+    entity_id: !input main_light
+    to: "off"
+
+  # Manual override timer finished
+  - id: manual_override_finished
+    platform: state
+    entity_id: !input global_manual_override_timer
+    to: "idle"
+    from: "active"
+
+  # Periodic tick every minute (gated by tick_ok)
+  - id: night_tick
+    platform: time_pattern
+    minutes: "/1"
+
+condition: []
+
+action:
+  - choose:
+
+      # Global or room disabled -> force OFF and exit
+      - conditions: "{{ is_state(master_enable_entity,'off') or is_state(room_enable_entity,'off') }}"
+        sequence:
+          - service: light.turn_off
+            target:
+              entity_id:
+                - "{{ main_light_entity }}"
+                - "{{ target_night_light }}"
+          - choose:
+              - conditions: "{{ ambilight != none }}"
+                sequence:
+                  - service: homeassistant.turn_off
+                    target: { entity_id: "{{ ambilight }}" }
+
+      # Presence or motion active -> apply mode (motion/presence overrides manual override)
+      - conditions: "{{ any_active and effective_mode != 'Off' }}"
+        sequence:
+          # Cancel manual override if motion/presence detected during override
+          - choose:
+              - conditions: "{{ override_timer and manual_override_active }}"
+                sequence:
+                  - service: timer.cancel
+                    target: { entity_id: "{{ override_timer }}" }
+          # debounce bursts from motion
+          - choose:
+              - conditions: "{{ trigger.id == 'motion_on' and (coalesce_window != '00:00:00') }}"
+                sequence:
+                  - delay: "{{ coalesce_window }}"
+          - choose:
+
+              # Day branch
+              - conditions: "{{ effective_mode == 'Day' }}"
+                sequence:
+                  - condition: template
+                    value_template: "{{ lux_ok_day }}"
+                  # avoid blink if night and main are same
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: >
+                              {{ target_night_light
+                                 and target_night_light != main_light_entity
+                                 and is_state(target_night_light, 'on') }}
+                        sequence:
+                          - service: light.turn_off
+                            target: { entity_id: "{{ target_night_light }}" }
+                  - choose:
+                      - conditions: "{{ use_yeelight_modes }}"
+                        sequence:
+                          - service: yeelight.set_mode
+                            data: { mode: normal }
+                            target: { entity_id: "{{ main_light_entity }}" }
+                  - service: light.turn_on
+                    target: { entity_id: "{{ main_light_entity }}" }
+                    data:
+                      brightness_pct: "{{ brightness_day_pct }}"
+                      color_temp: "{{ day_mireds }}"
+                  - choose:
+                      - conditions: "{{ ambilight != none }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: { entity_id: "{{ ambilight }}" }
+                  - choose:
+                      - conditions: "{{ (extra_on | length) > 0 }}"
+                        sequence:
+                          - service: homeassistant.turn_on
+                            target: !input extra_on_targets
+
+              # Night branch
+              - conditions: "{{ effective_mode == 'Night' }}"
+                sequence:
+                  - condition: template
+                    value_template: "{{ lux_ok_night }}"
+                  # optionally block turn-on in Auto Night
+                  - condition: template
+                    value_template: "{{ not (current_mode == 'Auto' and auto_night_block_turn_on and not is_state(target_night_light,'on') and not is_state(main_light_entity,'on')) }}"
+                  - choose:
+
+                      # Auto Night dim (Auto)
+                      - conditions: "{{ current_mode == 'Auto' and night_dim_enable }}"
+                        sequence:
+                          - choose:
+                              - conditions: "{{ use_yeelight_modes }}"
+                                sequence:
+                                  - service: yeelight.set_mode
+                                    data: { mode: moonlight }
+                                    target: { entity_id: "{{ target_night_light }}" }
+                          - service: light.turn_on
+                            target: { entity_id: "{{ target_night_light }}" }
+                            data:
+                              effect: "{{ 'Stop' if stop_effect else omit }}"
+                              brightness_pct: "{{ auto_night_pct | int }}"
+                              transition: "{{ t_immediate }}"
+                          - choose:
+                              - conditions: "{{ ambilight != none }}"
+                                sequence:
+                                  - service: homeassistant.turn_off
+                                    target: { entity_id: "{{ ambilight }}" }
+                          - choose:
+                              - conditions: "{{ (extra_on | length) > 0 }}"
+                                sequence:
+                                  - service: homeassistant.turn_on
+                                    target: !input extra_on_targets
+
+                      # Manual Night fixed
+                      - conditions: "{{ true }}"
+                        sequence:
+                          - choose:
+                              - conditions: "{{ use_yeelight_modes }}"
+                                sequence:
+                                  - service: yeelight.set_mode
+                                    data: { mode: moonlight }
+                                    target: { entity_id: "{{ target_night_light }}" }
+                          - service: light.turn_on
+                            target: { entity_id: "{{ target_night_light }}" }
+                            data:
+                              brightness_pct: "{{ brightness_night_pct }}"
+                              transition: "{{ t_immediate }}"
+                          - choose:
+                              - conditions: "{{ ambilight != none }}"
+                                sequence:
+                                  - service: homeassistant.turn_off
+                                    target: { entity_id: "{{ ambilight }}" }
+                          - choose:
+                              - conditions: "{{ (extra_on | length) > 0 }}"
+                                sequence:
+                                  - service: homeassistant.turn_on
+                                    target: !input extra_on_targets
+
+      # Empty -> turn off (both sources clear, and no keep-on, and not in manual override)
+      - conditions: "{{ trigger.id in ['presence_clear','motion_clear'] and all_clear and not keep_on_active and not manual_override_active }}"
+        sequence:
+          - service: light.turn_off
+            target:
+              entity_id:
+                - "{{ main_light_entity }}"
+                - "{{ target_night_light }}"
+          - choose:
+              - conditions: "{{ ambilight != none }}"
+                sequence:
+                  - service: homeassistant.turn_off
+                    target: { entity_id: "{{ ambilight }}" }
+          - choose:
+              - conditions: "{{ (extra_on | length) > 0 }}"
+                sequence:
+                  - service: homeassistant.turn_off
+                    target: !input extra_on_targets
+          - choose:
+              - conditions: "{{ (extra_off | length) > 0 }}"
+                sequence:
+                  - service: homeassistant.turn_off
+                    target: !input extra_off_targets
+
+      # Helper changes -> immediate apply when active
+      - conditions: "{{ trigger.id in ['mode_changed','enable_changed','global_night_changed','global_day_changed'] }}"
+        sequence:
+          - choose:
+
+              # Hard Off (also shut extras)
+              - conditions: "{{ states(room_mode_entity) == 'Off' }}"
+                sequence:
+                  - service: light.turn_off
+                    target:
+                      entity_id:
+                        - "{{ main_light_entity }}"
+                        - "{{ target_night_light }}"
+                  - choose:
+                      - conditions: "{{ ambilight != none }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: { entity_id: "{{ ambilight }}" }
+                  - choose:
+                      - conditions: "{{ (extra_on | length) > 0 }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: !input extra_on_targets
+                  - choose:
+                      - conditions: "{{ (extra_off | length) > 0 }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: !input extra_off_targets
+
+              # Apply immediately if active and not Off
+              - conditions: "{{ any_active and effective_mode != 'Off' }}"
+                sequence:
+                  - choose:
+
+                      # Partner Day (if honored) -> Day
+                      - conditions: "{{ (global_day_on and honor_day) and effective_mode == 'Day' }}"
+                        sequence:
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: >
+                                      {{ target_night_light
+                                         and target_night_light != main_light_entity
+                                         and is_state(target_night_light, 'on') }}
+                                sequence:
+                                  - service: light.turn_off
+                                    target: { entity_id: "{{ target_night_light }}" }
+                          - choose:
+                              - conditions: "{{ use_yeelight_modes }}"
+                                sequence:
+                                  - service: yeelight.set_mode
+                                    data: { mode: normal }
+                                    target: { entity_id: "{{ main_light_entity }}" }
+                          - service: light.turn_on
+                            target: { entity_id: "{{ main_light_entity }}" }
+                            data:
+                              brightness_pct: "{{ brightness_day_pct }}"
+                              color_temp: "{{ day_mireds }}"
+                              transition: "{{ t_immediate }}"
+                          - choose:
+                              - conditions: "{{ ambilight != none }}"
+                                sequence:
+                                  - service: homeassistant.turn_off
+                                    target: { entity_id: "{{ ambilight }}" }
+
+                      # Day immediate (respect apply_only_when_on)
+                      - conditions: >
+                          {{ effective_mode == 'Day' and
+                             (not only_when_on or
+                              is_state(main_light_entity,'on') or
+                              is_state(target_night_light,'on')) }}
+                        sequence:
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: >
+                                      {{ target_night_light
+                                         and target_night_light != main_light_entity
+                                         and is_state(target_night_light, 'on') }}
+                                sequence:
+                                  - service: light.turn_off
+                                    target: { entity_id: "{{ target_night_light }}" }
+                          - choose:
+                              - conditions: "{{ use_yeelight_modes }}"
+                                sequence:
+                                  - service: yeelight.set_mode
+                                    data: { mode: normal }
+                                    target: { entity_id: "{{ main_light_entity }}" }
+                          - service: light.turn_on
+                            target: { entity_id: "{{ main_light_entity }}" }
+                            data:
+                              brightness_pct: "{{ brightness_day_pct }}"
+                              color_temp: "{{ day_mireds }}"
+                              transition: "{{ t_immediate }}"
+                          - choose:
+                              - conditions: "{{ ambilight != none }}"
+                                sequence:
+                                  - service: homeassistant.turn_off
+                                    target: { entity_id: "{{ ambilight }}" }
+
+                      # Night immediate (respect bedroom/sleep block)
+                      - conditions: >
+                          {{ effective_mode == 'Night' and
+                             (not only_when_on or
+                              is_state(target_night_light,'on') or
+                              is_state(main_light_entity,'on')) and
+                             not (current_mode == 'Auto' and auto_night_block_turn_on and not is_state(target_night_light,'on') and not is_state(main_light_entity,'on')) and
+                             not (sleep_block_turn_on and not (is_state(target_night_light,'on') or is_state(main_light_entity,'on'))) }}
+                        sequence:
+                          - choose:
+                              - conditions: "{{ is_state(main_light_entity,'on') }}"
+                                sequence:
+                                  - service: light.turn_off
+                                    target: { entity_id: "{{ main_light_entity }}" }
+                          - choose:
+                              - conditions: "{{ use_yeelight_modes }}"
+                                sequence:
+                                  - service: yeelight.set_mode
+                                    data: { mode: moonlight }
+                                    target: { entity_id: "{{ target_night_light }}" }
+                          - choose:
+                              - conditions: "{{ stop_effect }}"
+                                sequence:
+                                  - service: light.turn_on
+                                    target: { entity_id: "{{ target_night_light }}" }
+                                    data: { effect: "Stop" }
+                          - service: light.turn_on
+                            target: { entity_id: "{{ target_night_light }}" }
+                            data:
+                              brightness_pct: >-
+                                {{ auto_night_pct if (current_mode == 'Auto' and night_dim_enable) else brightness_night_pct }}
+                              transition: "{{ t_immediate }}"
+                          - choose:
+                              - conditions: "{{ ambilight != none }}"
+                                sequence:
+                                  - service: homeassistant.turn_off
+                                    target: { entity_id: "{{ ambilight }}" }
+
+      # Adopt external ON (manual/Alexa/app)
+      - conditions: >
+          {{ trigger.id == 'external_main_on'
+             and adopt_on
+             and (not adopt_only_in_auto or current_mode == 'Auto') }}
+        sequence:
+          - wait_template: "{{ is_state(main_light_entity, 'on') }}"
+            timeout: "00:00:01"
+            continue_on_timeout: true
+          # Set room to Auto mode if requested
+          - choose:
+              - conditions: "{{ set_auto_on_manual and current_mode != 'Auto' }}"
+                sequence:
+                  - service: input_select.select_option
+                    target: { entity_id: "{{ room_mode_entity }}" }
+                    data: { option: "Auto" }
+          # Restart global manual override timer if configured
+          - choose:
+              - conditions: "{{ override_timer }}"
+                sequence:
+                  - service: timer.start
+                    target: { entity_id: "{{ override_timer }}" }
+                    data: { duration: "00:01:30" }
+          # tiny cushion against rapid attribute flaps (max 2s even if input is larger)
+          - delay:
+              seconds: "{{ [adopt_grace|int(0), 2] | min }}"
+          - choose:
+
+              - conditions: "{{ effective_mode == 'Day' }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: >
+                              {{ target_night_light
+                                 and target_night_light != main_light_entity
+                                 and is_state(target_night_light, 'on') }}
+                        sequence:
+                          - service: light.turn_off
+                            target: { entity_id: "{{ target_night_light }}" }
+                  - service: light.turn_on
+                    target: { entity_id: "{{ main_light_entity }}" }
+                    data:
+                      brightness_pct: "{{ brightness_day_pct }}"
+                      color_temp: "{{ day_mireds }}"
+                      transition: "{{ t_immediate }}"
+                  - choose:
+                      - conditions: "{{ ambilight != none }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: { entity_id: "{{ ambilight }}" }
+
+              - conditions: "{{ effective_mode == 'Night' }}"
+                sequence:
+                  - choose:
+                      - conditions: "{{ use_yeelight_modes }}"
+                        sequence:
+                          - service: yeelight.set_mode
+                            data: { mode: moonlight }
+                            target: { entity_id: "{{ target_night_light }}" }
+                  - choose:
+                      - conditions: "{{ stop_effect }}"
+                        sequence:
+                          - service: light.turn_on
+                            target: { entity_id: "{{ target_night_light }}" }
+                            data: { effect: "Stop" }
+                  - service: light.turn_on
+                    target: { entity_id: "{{ target_night_light }}" }
+                    data:
+                      brightness_pct: >-
+                        {{ auto_night_pct if (current_mode == 'Auto' and night_dim_enable) else brightness_night_pct }}
+                      transition: "{{ t_immediate }}"
+                  # Ensure ambilight is turned off during manual control
+                  - choose:
+                      - conditions: "{{ ambilight != none }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: { entity_id: "{{ ambilight }}" }
+
+  # Partner Day daily reset
+  - choose:
+      - conditions: "{{ trigger.id == 'partner_day_reset' and reset_pd_here }}"
+        sequence:
+          - service: input_boolean.turn_off
+            target: { entity_id: "{{ global_day_entity }}" }
+
+  # Return to Auto when Sleep OFF
+  - choose:
+      - conditions: "{{ trigger.id == 'global_night_changed' and sleep_return_to_auto and is_state(global_night_entity, 'off') }}"
+        sequence:
+          - service: input_select.select_option
+            target: { entity_id: "{{ room_mode_entity }}" }
+            data: { option: "Auto" }
+
+  # Auto Night periodic tick (during dimming window)
+  - choose:
+      - conditions: "{{ trigger.id == 'night_tick' and tick_ok and night_dim_enable and states(room_mode_entity) == 'Auto' and effective_mode == 'Night' and any_active and in_auto_night_window }}"
+        sequence:
+          - choose:
+              - conditions: "{{ not only_when_on or is_state(target_night_light, 'on') }}"
+                sequence:
+                  - choose:
+                      - conditions: "{{ use_yeelight_modes }}"
+                        sequence:
+                          - service: yeelight.set_mode
+                            data: { mode: moonlight }
+                            target: { entity_id: "{{ target_night_light }}" }
+                  - choose:
+                      - conditions: "{{ stop_effect }}"
+                        sequence:
+                          - service: light.turn_on
+                            target: { entity_id: "{{ target_night_light }}" }
+                            data: { effect: "Stop" }
+                  - service: light.turn_on
+                    target: { entity_id: "{{ target_night_light }}" }
+                    data:
+                      brightness_pct: "{{ auto_night_pct | int }}"
+                      transition: "{{ t_gradual }}"
+
+  # Auto Night maintain final state (after dimming window)
+  - choose:
+      - conditions: "{{ trigger.id == 'night_tick' and tick_ok and night_dim_enable and states(room_mode_entity) == 'Auto' and effective_mode == 'Night' and any_active and not in_auto_night_window }}"
+        sequence:
+          - choose:
+              - conditions: "{{ not only_when_on or is_state(target_night_light, 'on') }}"
+                sequence:
+                  - choose:
+                      - conditions: "{{ use_yeelight_modes }}"
+                        sequence:
+                          - service: yeelight.set_mode
+                            data: { mode: moonlight }
+                            target: { entity_id: "{{ target_night_light }}" }
+                  - service: light.turn_on
+                    target: { entity_id: "{{ target_night_light }}" }
+                    data:
+                      brightness_pct: "{{ night_target_pct }}"
+                      transition: "{{ t_immediate }}"
+
+  # Handle external OFF (manual/Alexa/app) - respect manual control
+  - choose:
+      - conditions: >
+          {{ trigger.id == 'external_main_off'
+             and adopt_on }}
+        sequence:
+          # Turn off ambilight too if configured
+          - choose:
+              - conditions: "{{ ambilight != none }}"
+                sequence:
+                  - service: homeassistant.turn_off
+                    target: { entity_id: "{{ ambilight }}" }
+
+  # Handle manual override timer expiration - return to automated state
+  - choose:
+      - conditions: "{{ trigger.id == 'manual_override_finished' and override_timer }}"
+        sequence:
+          # Re-evaluate state. If room is clear, turn lights off.
+          # If room is occupied, the next presence/motion trigger will take over.
+          - choose:
+              - conditions: "{{ all_clear and not keep_on_active }}"
+                sequence:
+                  - service: light.turn_off
+                    target:
+                      entity_id:
+                        - "{{ main_light_entity }}"
+                        - "{{ target_night_light }}"
+                  - choose:
+                      - conditions: "{{ ambilight != none }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: { entity_id: "{{ ambilight }}" }
+                  - choose:
+                      - conditions: "{{ (extra_on | length) > 0 }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: !input extra_on_targets
+                  - choose:
+                      - conditions: "{{ (extra_off | length) > 0 }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: !input extra_off_targets

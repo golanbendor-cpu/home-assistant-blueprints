@@ -1,0 +1,375 @@
+blueprint:
+  name: Bedside Strip Night Guide (TV/Ceiling Guards)
+  description: >
+    Turns a bedside LED strip on with motion ONLY during a night window (default 23:00–10:00)
+    or when Night helper is ON. Will NOT turn on if the TV is active or if any ceiling light is ON,
+    and will immediately turn OFF if TV/ceiling turns ON. Includes optional motion coalesce (debounce).
+
+  domain: automation
+
+  input:
+    # Core entities
+    motion_sensor:
+      name: Motion sensor
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+
+    strip_light:
+      name: LED strip light
+      selector:
+        entity:
+          domain: light
+
+    enable_switch:
+      name: Feature enable switch
+      description: Must be ON for this automation to run.
+      selector:
+        entity:
+          domain: input_boolean
+
+    night_helper:
+      name: Night helper (input_boolean)
+      description: If ON, allows the strip to run regardless of time window.
+      selector:
+        entity:
+          domain: input_boolean
+
+    tv_active_sensor:
+      name: TV active sensor (binary_sensor)
+      selector:
+        entity:
+          domain: binary_sensor
+
+    ceiling_lights:
+      name: Ceiling lights (one or more)
+      description: If any of these are ON, the strip will not turn on; if they turn ON, the strip will turn OFF.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: light
+
+    reading_lights:
+      name: Reading lights (optional)
+      description: If any of these are ON, the strip will not turn on; if they turn ON, the strip will turn OFF.
+      default: {}
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: light
+
+    # Brightness & color controls (use your existing helpers)
+    brightness_number:
+      name: Brightness input_number
+      description: e.g. input_number.bedroom_bed_led_brightness
+      selector:
+        entity:
+          domain: input_number
+
+    min_brightness_pct:
+      name: Minimum brightness % (floor)
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+    color_mode_select:
+      name: Color mode input_select
+      description: >-
+        Values expected: Color Temp, Amber, Warm White, Red, Blue, Green, Purple, Rainbow
+      selector:
+        entity:
+          domain: input_select
+
+    color_temp_number:
+      name: Color temperature input_number (mireds)
+      description: Used when Color Mode = Color Temp. Example default 450.
+      selector:
+        entity:
+          domain: input_number
+
+    # Time window
+    night_start_time:
+      name: Night window start
+      default: "23:00:00"
+      selector:
+        time: {}
+
+    night_end_time:
+      name: Night window end
+      default: "10:00:00"
+      selector:
+        time: {}
+
+    # Timings
+    off_clear_seconds:
+      name: Motion clear OFF delay (seconds)
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 600
+          mode: slider
+          step: 1
+          unit_of_measurement: "s"
+
+    coalesce_window:
+      name: Motion coalesce window (debounce)
+      description: Optional delay applied only for motion-on events to debounce bursts.
+      default: "00:00:00"
+      selector:
+        duration: {}
+
+    transition_on_sec:
+      name: Transition seconds (turn ON)
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 1
+          unit_of_measurement: "s"
+
+    transition_off_sec:
+      name: Transition seconds (turn OFF)
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 1
+          unit_of_measurement: "s"
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  motion_entity: !input motion_sensor
+  strip_entity: !input strip_light
+  enable_entity: !input enable_switch
+  night_helper_entity: !input night_helper
+  tv_sensor: !input tv_active_sensor
+  ceiling_list: !input ceiling_lights
+  reading_list: !input reading_lights
+
+  bright_num: !input brightness_number
+  min_bright: !input min_brightness_pct
+  color_mode_sel: !input color_mode_select
+  color_temp_num: !input color_temp_number
+
+  night_start: !input night_start_time
+  night_end: !input night_end_time
+
+  coalesce_win: !input coalesce_window
+  t_on: !input transition_on_sec
+  t_off: !input transition_off_sec
+  off_clear: !input off_clear_seconds
+
+  # Helpers
+  any_ceiling_on: "{{ expand(ceiling_list) | selectattr('state','eq','on') | list | length > 0 }}"
+  any_reading_on: "{{ expand(reading_list) | selectattr('state','eq','on') | list | length > 0 }}"
+  in_night_window: >
+    {% set s = night_start %}
+    {% set e = night_end %}
+    {% set t = now().strftime('%H:%M:%S') %}
+    {% set wraps = e < s %}
+    {{ (not wraps and s <= t <= e) or (wraps and (t >= s or t <= e)) }}
+
+trigger:
+  # Motion drives ON/OFF
+  - id: motion_on
+    platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+
+  - id: motion_off
+    platform: state
+    entity_id: !input motion_sensor
+    to: "off"
+    for:
+      seconds: !input off_clear_seconds
+
+  # TV guard: if TV turns ON, kill strip immediately
+  - id: tv_on
+    platform: state
+    entity_id: !input tv_active_sensor
+    to: "on"
+
+  # Ceiling guards: if any ceiling light turns ON, kill strip immediately
+        - id: ceiling_on
+        platform: state
+        entity_id: !input ceiling_lights
+        to: "on"
+
+      # Reading light guards: if any reading light turns ON, kill strip immediately
+      - id: reading_on
+        platform: state
+        entity_id: !input reading_lights
+        to: "on"
+
+condition: []
+
+action:
+  - choose:
+
+      # ===== Immediate OFF guards (TV or any ceiling turned on) =====
+      - conditions: "{{ trigger.id in ['tv_on','ceiling_on','reading_on'] }}"
+        sequence:
+          - service: light.turn_off
+            target: { entity_id: "{{ strip_entity }}" }
+            data:
+              transition: "{{ t_off | int }}"
+
+      # ===== MOTION ON → turn strip on (with guards) =====
+      - conditions: "{{ trigger.id == 'motion_on' }}"
+        sequence:
+          # Optional motion coalesce (debounce)
+          - choose:
+              - conditions: "{{ coalesce_win != '00:00:00' }}"
+                sequence:
+                  - delay: !input coalesce_window
+
+          # 1) Night window OR Night helper
+          - condition: or
+            conditions:
+              - condition: template
+                value_template: "{{ in_night_window }}"
+              - condition: state
+                entity_id: !input night_helper
+                state: "on"
+
+          # 2) Feature enabled
+          - condition: state
+            entity_id: !input enable_switch
+            state: "on"
+
+          # 3) Ceiling guard: proceed only if ALL ceiling lights are OFF
+          - condition: template
+            value_template: "{{ not any_ceiling_on }}"
+
+          # 4) Reading light guard: proceed only if ALL reading lights are OFF
+          - condition: template
+            value_template: "{{ not any_reading_on }}"
+
+          # 5) TV guard: proceed only if TV is OFF
+          - condition: state
+            entity_id: !input tv_active_sensor
+            state: "off"
+
+          # Apply chosen color mode and brightness in a single call
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Color Temp"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      color_temp: "{{ states(color_temp_num) | int(450) }}"
+                      transition: "{{ t_on | int }}"
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Amber"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      rgb_color: [255, 160, 60]
+                      transition: "{{ t_on | int }}"
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Warm White"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      color_temp: 370
+                      transition: "{{ t_on | int }}"
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Red"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      rgb_color: [255, 60, 60]
+                      transition: "{{ t_on | int }}"
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Blue"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      rgb_color: [80, 120, 255]
+                      transition: "{{ t_on | int }}"
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Green"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      rgb_color: [60, 200, 90]
+                      transition: "{{ t_on | int }}"
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Purple"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      rgb_color: [180, 80, 255]
+                      transition: "{{ t_on | int }}"
+
+              - conditions:
+                  - condition: state
+                    entity_id: !input color_mode_select
+                    state: "Rainbow"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ strip_entity }}" }
+                    data:
+                      brightness_pct: >
+                        {{ [ states(bright_num)|int(5), min_bright|int ] | max }}
+                      effect: "Color flow"
+
+      # ===== MOTION OFF → turn strip off =====
+      - conditions: "{{ trigger.id == 'motion_off' }}"
+        sequence:
+          - service: light.turn_off
+            target: { entity_id: "{{ strip_entity }}" }
+            data:
+              transition: "{{ t_off | int }}"

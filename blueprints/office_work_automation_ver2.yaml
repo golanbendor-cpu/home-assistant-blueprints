@@ -1,0 +1,354 @@
+blueprint:
+  name: Office Work Automation V2 (PC Screen + Day Mode)
+  description: >
+    WORKING: Complete office work automation that detects work activity via chair vibration,
+    turns on PC screen, switches to Day mode lighting, and manages work sessions.
+    ONLY chair vibrations trigger work (no unreliable desk presence backup).
+    Instant response with smart state handling for external PC shutdowns.
+  domain: automation
+
+  input:
+    chair_vibration_sensor:
+      name: Chair Vibration Sensor
+      description: Vibration sensor on chair frame (detects work activity)
+      selector: 
+        entity: 
+          domain: binary_sensor
+          device_class: vibration
+
+    desk_presence_sensor:
+      name: Desk Presence Sensor  
+      description: Presence sensor covering desk area (safety check only)
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: occupancy
+
+    office_space_sensor:
+      name: Office Space Presence Sensor
+      description: Presence sensor covering entire office space
+      selector:
+        entity:
+          domain: binary_sensor  
+          device_class: occupancy
+
+    pc_screen_switch:
+      name: Office PC Screen Switch
+      description: Switch controlling office PC screen (switch.office_pc_screen)
+      selector:
+        entity:
+          domain: switch
+
+    office_mode_select:
+      name: Office Mode Selector
+      description: Input select for office lighting mode (Auto/Day/Night/Off)
+      selector:
+        entity:
+          domain: input_select
+
+    work_mode_toggle:
+      name: Office Work Mode Toggle
+      description: Helper to track if currently in work session
+      selector:
+        entity:
+          domain: input_boolean
+
+    maintenance_mode_toggle:
+      name: Office Maintenance Mode Toggle  
+      description: Temporary block for brief movements (prevents false triggers)
+      selector:
+        entity:
+          domain: input_boolean
+
+    vibration_verification_time:
+      name: Vibration Verification Period (seconds)
+      description: Time to wait for more vibrations after PC turns on (confirms work)
+      default: 30
+      selector:
+        number:
+          min: 15
+          max: 120
+          unit_of_measurement: "s"
+
+    vibration_cooldown:
+      name: Vibration Cooldown (seconds)  
+      description: Prevent rapid on/off cycling from multiple vibrations
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 10
+          unit_of_measurement: "s"
+
+    office_exit_delay:
+      name: Office Exit Delay (minutes)
+      description: How long office space must be clear before ending work session
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 10
+          unit_of_measurement: "min"
+
+    desk_clear_delay:
+      name: Desk Clear Delay (minutes)
+      description: How long desk must be clear before ending work session
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 5
+          unit_of_measurement: "min"
+
+    enable_time_restriction:
+      name: Enable Time Restrictions
+      description: Only activate during specified hours
+      default: false
+      selector: 
+        boolean: {}
+
+    work_start_time:
+      name: Work Hours Start Time
+      description: Earliest time to activate work sessions
+      default: "07:00:00"
+      selector:
+        time: {}
+
+    work_end_time:
+      name: Work Hours End Time  
+      description: Latest time to activate work sessions
+      default: "23:00:00"
+      selector:
+        time: {}
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  chair_sensor: !input chair_vibration_sensor
+  desk_sensor: !input desk_presence_sensor
+  office_sensor: !input office_space_sensor
+  pc_switch: !input pc_screen_switch
+  office_mode: !input office_mode_select
+  work_toggle: !input work_mode_toggle
+  maintenance_toggle: !input maintenance_mode_toggle
+  
+  verification_secs: !input vibration_verification_time
+  cooldown_secs: !input vibration_cooldown
+  office_exit_mins: !input office_exit_delay
+  desk_clear_mins: !input desk_clear_delay
+  
+  time_restricted: !input enable_time_restriction
+  start_time: !input work_start_time
+  end_time: !input work_end_time
+
+trigger:
+  # ONLY trigger: Chair vibration (work activity detected) - only when not working
+  - id: chair_vibration
+    platform: state
+    entity_id: !input chair_vibration_sensor
+    to: 'on'
+
+  # Work session end: Office space clear AND desk clear
+  - id: office_exit
+    platform: state
+    entity_id: !input office_space_sensor
+    to: 'off'
+    for:
+      minutes: !input office_exit_delay
+
+  # PC Screen turned OFF externally (Alexa/manual) - immediate work session end
+  - id: pc_screen_off
+    platform: state
+    entity_id: !input pc_screen_switch
+    to: 'off'
+
+  # PC Screen turned ON manually - resume work session if at desk
+  - id: pc_screen_on
+    platform: state
+    entity_id: !input pc_screen_switch
+    to: 'on'
+
+condition: []
+
+action:
+  - choose:
+      
+      # === CHAIR VIBRATION DETECTED (Work Activity) ===
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'chair_vibration' }}"
+          # Must be at desk area (safety check - prevents false triggers)
+          - condition: state
+            entity_id: !input desk_presence_sensor
+            state: 'on'
+          # ONLY trigger when NOT already in perfect work state
+          - condition: template
+            value_template: >
+              {{ not (is_state(work_toggle, 'on') and is_state(pc_switch, 'on')) }}
+          # Maintenance mode check
+          - condition: state
+            entity_id: !input maintenance_mode_toggle
+            state: 'off'
+          # Time restrictions (if enabled)
+          - condition: template
+            value_template: >
+              {{ not time_restricted or 
+                 (now().time() >= strptime(start_time, '%H:%M:%S').time() and 
+                  now().time() <= strptime(end_time, '%H:%M:%S').time()) }}
+        sequence:
+          # Check current state and act accordingly
+          - choose:
+              # Case 1: Not in work mode - Start new work session
+              - conditions:
+                  - condition: state
+                    entity_id: !input work_mode_toggle
+                    state: 'off'
+                  # Cooldown period (prevent rapid on/off from multiple vibrations)
+                  - condition: template
+                    value_template: >
+                      {{ (now() - states[work_toggle].last_changed).total_seconds() > cooldown_secs }}
+                sequence:
+                  # Turn on PC screen immediately
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input pc_screen_switch
+                  
+                  # Switch to Day mode lighting
+                  - service: input_select.select_option
+                    target:
+                      entity_id: !input office_mode_select
+                    data:
+                      option: 'Day'
+                  
+                  # Set work session active
+                  - service: input_boolean.turn_on
+                    target:
+                      entity_id: !input work_mode_toggle
+
+              # Case 2: Work mode ON but PC screen OFF - Resume work (after Alexa shutdown)
+              - conditions:
+                  - condition: state
+                    entity_id: !input work_mode_toggle
+                    state: 'on'
+                  - condition: state
+                    entity_id: !input pc_screen_switch
+                    state: 'off'
+                sequence:
+                  # Turn PC screen back on
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input pc_screen_switch
+                  
+                  # Ensure Day mode is active
+                  - service: input_select.select_option
+                    target:
+                      entity_id: !input office_mode_select
+                    data:
+                      option: 'Day'
+
+      # === WORK SESSION END (Office Exit) ===  
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'office_exit' }}"
+          # Was in work session
+          - condition: state
+            entity_id: !input work_mode_toggle
+            state: 'on'
+          # PC screen still ON (ghost protection - only exit if genuinely working)
+          - condition: state
+            entity_id: !input pc_screen_switch
+            state: 'on'
+          # Desk also clear (both sensors must be clear)
+          - condition: state
+            entity_id: !input desk_presence_sensor
+            state: 'off'
+            for:
+              minutes: !input desk_clear_delay
+        sequence:
+          # Turn off PC screen
+          - service: switch.turn_off
+            target:
+              entity_id: !input pc_screen_switch
+          
+          # Return to Auto lighting mode
+          - service: input_select.select_option
+            target:
+              entity_id: !input office_mode_select
+            data:
+              option: 'Auto'
+          
+          # Clear work session
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input work_mode_toggle
+          
+          # Clear any maintenance block
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input maintenance_mode_toggle
+
+      # === PC SCREEN TURNED OFF MANUALLY (Immediate Work End) ===  
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'pc_screen_off' }}"
+          # Was in active work session
+          - condition: state
+            entity_id: !input work_mode_toggle
+            state: 'on'
+        sequence:
+          # Clear work session immediately (user manually turned off PC)
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input work_mode_toggle
+          
+          # Return office to Auto mode
+          - service: input_select.select_option
+            target:
+              entity_id: !input office_mode_select
+            data:
+              option: 'Auto'
+          
+          # Clear any maintenance block
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input maintenance_mode_toggle
+
+      # === PC SCREEN TURNED ON MANUALLY (Resume Work if at Desk) ===
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'pc_screen_on' }}"
+          # Not currently in work session
+          - condition: state
+            entity_id: !input work_mode_toggle
+            state: 'off'
+          # Must be at desk area
+          - condition: state
+            entity_id: !input desk_presence_sensor
+            state: 'on'
+          # Maintenance mode check
+          - condition: state
+            entity_id: !input maintenance_mode_toggle
+            state: 'off'
+          # Time restrictions (if enabled)
+          - condition: template
+            value_template: >
+              {{ not time_restricted or 
+                 (now().time() >= strptime(start_time, '%H:%M:%S').time() and 
+                  now().time() <= strptime(end_time, '%H:%M:%S').time()) }}
+          # Cooldown period (prevent rapid on/off cycles)
+          - condition: template
+            value_template: >
+              {{ (now() - states[work_toggle].last_changed).total_seconds() > cooldown_secs }}
+        sequence:
+          # Resume work session
+          - service: input_boolean.turn_on
+            target:
+              entity_id: !input work_mode_toggle
+          
+          # Switch to Day mode lighting
+          - service: input_select.select_option
+            target:
+              entity_id: !input office_mode_select
+            data:
+              option: 'Day'
